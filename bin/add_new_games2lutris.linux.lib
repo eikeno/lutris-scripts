@@ -1,0 +1,17 @@
+#!/bin/bash
+# $@: full path to a start.sh file,
+
+echo "Considering $*"
+d="$(dirname "$@")"
+
+chmod +x "$@" || exit
+( 
+	pushd "$d" &> /dev/null  || exit
+	if [[ -e .lutris_added ]]; then
+		echo "Already in LUTRIS, skipped"
+	else
+		echo "Adding game in $(basename "$d")..."
+		start.sh2lutris.sh "$(wine-dirname2lutris_slug.sh)" && touch .lutris_added
+	fi
+	popd &> /dev/null || exit
+)

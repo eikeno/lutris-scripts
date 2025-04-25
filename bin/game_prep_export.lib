@@ -1,0 +1,24 @@
+#!/bin/bash
+# $@ : full path to a folder containing game files
+
+echo ">> $0 starting"
+echo '/*************/'
+
+\pushd "$@" &> /dev/null || exit
+echo "Considering $(basename "$@")"
+matches="$(find . -type f -name "*.exe" | grep -E -vi '(unins000|Shipping|Il2CppAssemblyGenerator|DirectX|Verify|PrereqSetup|CrashHandler|CrashReport|redist|/external/|UnrealCEF)')"
+
+exe="$(echo "$matches" | fzf)"
+
+echo "WILL USE EXE $exe"
+bnexe="$(basename "$exe")"
+d="$(dirname "$exe")"
+
+echo "$d/$bnexe" | sed 's,^\./,,' > LUTRIS
+
+\popd &> /dev/null || exit
+
+echo ">> $0 ending."
+echo '/*************/'
+echo 
+

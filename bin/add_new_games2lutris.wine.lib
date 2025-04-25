@@ -1,0 +1,10 @@
+#!/bin/bash
+# $*: full path to a LUTRIS file
+
+d=$(dirname "$*" )
+
+(
+	pushd "$d" &> /dev/null|| exit
+	add_to_lutris.sh LUTRIS
+	popd &> /dev/null|| exit
+)

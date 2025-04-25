@@ -1,0 +1,47 @@
+#!/bin/bash
+# $@ : full path to a folder containing game files
+
+echo ">> $0 starting"
+echo '/*************/'
+
+\pushd "$@" &> /dev/null || exit 10
+echo "Considering $(basename "$@")"
+
+## file versions marks
+find . -maxdepth 5 -type f -name "setup_*.exe" | while read -r d; do
+	t="$(echo "$d" | sed -e 's/setup_//' -e 's/.exe/.txt/' )";
+	echo "$t"; touch "$t"
+done
+
+## file versions marks
+find DLC -maxdepth 5 -type f -name "*.exe" | while read -r d; do
+	t="$(echo "$d" | sed -e 's/setup_//' -e 's/.exe/.txt/' )";
+	echo "$t"; touch "$t"
+done
+
+find dlc -maxdepth 5 -type f -name "*.exe" | while read -r d; do
+	t="$(echo "$d" | sed -e 's/setup_//' -e 's/.exe/.txt/' )";
+	echo "$t"; touch "$t"
+done
+
+rm -f DLC/*.{exe,bin} 2/dev/null
+rm -f dlc/*.{exe,bin} 2/dev/null
+
+# del install files EXEs
+find . -maxdepth 2 -type f -name "setup_*.exe" | while read -r d; do
+	echo "Deleting: $d"
+	rm -f "$d"
+done
+
+# del install files BINs
+find . -maxdepth 2 -type f -name "setup_*.bin" | while read -r d; do
+	echo "Deleting: $d"
+	rm -f "$d"
+done
+
+\popd &> /dev/null || exit
+
+echo ">> $0 ending."
+echo '/*************/'
+echo 
+
