@@ -1,4 +1,5 @@
 #!/bin/bash
+# deprecated, do not use
 # mv covers that's be under <dir>/coverarts/ to <dir>/coverarts/n
 # Where 'n' is the first character of the filename. To be used with patched Lutris.
 # depends : any2jpg.sh
