@@ -8,7 +8,7 @@ echo "current unix time = $DATE_S"
 
 LUTRIS_GAMEDIR="$HOME/.local/share/lutris/games"
 LUTRIS_DBFILE="$HOME/.local/share/lutris/pga.db"
-[ ! -e "/storage/GAMES_MASTER/LUTRIS/LUTRIS_RETRO/.local/lutris/pga.db" ] && \
+[ ! -e "$HOME/.local/lutris/pga.db" ] && \
   echo "pga.db not found at $HOME/.local/lutris/pga.db" && exit 3
 GAME_NAME="$(basename "$@" ".3ds")"
 echo "GAME_NAME = $GAME_NAME"
