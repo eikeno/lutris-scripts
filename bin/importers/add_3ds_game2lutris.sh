@@ -6,9 +6,10 @@ echo "current unix time = $DATE_S"
 
 [ -z "$1" ] && echo "$0 GAME_FULL_PATH" && exit 2
 
-LUTRIS_GAMEDIR="/storage/GAMES_MASTER/LUTRIS/LUTRIS_RETRO/.config/lutris/games"
-LUTRIS_DBFILE="/storage/GAMES_MASTER/LUTRIS/LUTRIS_RETRO/.local/lutris/pga.db"
-[ ! -e "/storage/GAMES_MASTER/LUTRIS/LUTRIS_RETRO/.local/lutris/pga.db" ] && echo "pga.db not found at $/storage/GAMES_MASTER/LUTRIS/LUTRIS_RETRO/.local/lutris/pga.db" && exit 3
+LUTRIS_GAMEDIR="$HOME/.local/share/lutris/games"
+LUTRIS_DBFILE="$HOME/.local/share/lutris/pga.db"
+[ ! -e "/storage/GAMES_MASTER/LUTRIS/LUTRIS_RETRO/.local/lutris/pga.db" ] && \
+  echo "pga.db not found at $HOME/.local/lutris/pga.db" && exit 3
 GAME_NAME="$(basename "$@" ".3ds")"
 echo "GAME_NAME = $GAME_NAME"
 SLUG="$(string_to_slug.sh "$GAME_NAME")""-3ds"
