@@ -37,7 +37,7 @@ game:
   arch: win64
   args: ''
   exe: "$EXE"
-  prefix: "$HOME/LUTRIS/SHARED_PREFIXES/PROTON"
+  prefix: "$HOME/LUTRIS/SHARED_PREFIXES/UMU"
   working_dir: "$(dirname "$EXE")"
 system:
   prefer_system_libs: true
