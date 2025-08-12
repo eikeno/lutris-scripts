@@ -1,157 +1,103 @@
 #!/bin/bash
-# $1: base64 encoded string for: gamedir;slug # -> poorest man's serialization :-)
+# $1: base64 encoded string for: gamedir;slug  A.k.a -> poorest man's serialization :-)
 # depends : sqlite3
+# depends : fzf
+# WARNING: This is configured for the way I organize my games on a NAS, do not
+# WARNING: use it without fully understanding what it does and modify it to
+# WARNING: YOUR needs. Chances are you do not need this at all.
+# WARNING: Also, despite it would be possible to call this script directly,
+# WARNING: it's intended to be called via a modified Lutris desktop client.
+
 echo ">>> $0 :: $*"
-# TODO: modify to work on arch (/run/media inst. of /media)
 
 LUTRIS_GAMEDIR="$HOME/.local/share/lutris/games"
 LUTRIS_DBFILE="$HOME/.local/share/lutris/pga.db"
-NAS="/storage/nas"
+DESTPATHS_FILE="$HOME/.config/lutris_migration_paths.conf"
 
-src="$(echo "$@" | base64 -d | cut -f1 -d';')"
+# debugf="/dev/null" # lazy...
+debugf="/tmp/lutris_debug.txt"
+echo > $debugf
+
+EXE="$(echo "$@" | base64 -d | cut -f1 -d';')"
 SLUG="$(echo "$@" | base64 -d | cut -f2 -d';')"
 
-echo "src=$src"
-echo "SLUG=$SLUG"
+echo "EXE = $EXE"    | tee -a $debugf
+echo "SLUG = $SLUG"  | tee -a $debugf
 
-[ -z "$src" ] && echo  "$0 BASE64_STR" && echo "err_empty_src" && exit 2
+[ -z "$EXE" ] && echo  "$0 BASE64_STR" && echo "err_empty_EXE" && exit 2
+[ ! -e "$EXE" ] && exit 21
 [ -z "$SLUG" ] && echo "$0 BASE64_STR" && echo "err_empty_SLUG" && exit 2
 
-gamedir="$(basename "$src")"
-echo "gamedir=$gamedir"
+EXEDIR=$(dirname "$EXE")
+_exedir_parent="$(dirname "$EXEDIR")"
+GAMEDIR="$(basename "$_exedir_parent")"
 
-# find source media
-if echo "$src" | grep  -q ^"/media/$USERNAME/"; then
-	SRC_TYPE="local"
-	# local disk
-	srcmed="$(echo "$src" | sed "s,^/media/$USERNAME/,," | cut -f1 -d'/')"
-	echo "srcmed=$srcmed"
+echo "EXEDIR = $EXEDIR" | tee -a $debugf
+echo "GAMEDIR = $GAMEDIR"| tee -a $debugf
 
-	srcpath="$(echo "$src" | sed "s,^/media/$USERNAME/,," | sed "s,$srcmed/,,") "
-	echo "srcpath=$srcpath"
+echo "$EXE" | grep -a ^/storage/nas || exit 3
 
-elif echo "$src" | grep  -q ^"/storage/nas/"; then
-	SRC_TYPE="nas"
-	# Disk on NAS:
-	srcmed="$(echo "$src" | sed "s,^/storage/nas/,," | cut -f1 -d'/')"
-	echo "srcmed=$srcmed"
+SRC_DRIVE=$(echo $EXE | cut -f4 -d'/')
+[ -s "$SRC_DRIVE" ] && exit 4
+echo "SRC_DRIVE = $SRC_DRIVE" | tee -a $debugf
 
-	srcpath="$(echo "$src" | sed "s,^/storage/nas/,," | sed "s,$srcmed/,,")"
-	echo "srcpath=$srcpath"
-else
-	echo "exit 3"
-	exit 3
-fi
+# FIXME: doing like this doesn't work when the exe file is not directly at
+# the root of the gamedir. Instead, should check parent dirs, one by one
+# until the LUTRIS file is found:
+DN1=$(dirname "$EXEDIR")
+DN2=$(dirname "$DN1")
+DN3=$(dirname "$DN2")
+GAMESTORE=$(basename "$DN3")
+echo "GAMESTORE = $GAMESTORE" | tee -a $debugf
 
-echo "==="
-echo "SRC_TYPE: $SRC_TYPE"
-echo "srcmed: $srcmed"
-echo "srcpath: $srcpath"
-echo "==="
+fl=${GAMEDIR:0:1}
+FL=${fl^^}
+echo "FL = $FL" | tee -a $debugf
 
-# add NAS to choices if accessible
-if [ -n "$DEST_MEDIA" ]; then
-	echo "Overriding 'dstmed' with $DEST_MEDIA  based on DEST_MEDIA env var."
-	dstmed="$DEST_MEDIA" # useful to allow call from other scripts, with destination already defined
-else
-	echo "Please select destination media:" 
-	if [ -e "$NAS/.nas_is_mounted" ]; then
-		echo  "NAS seems accessible"
-		dstmed="$( (ls -1 $NAS ; ls -1 "/media/$USERNAME/") | fzf)"
-		echo "dstmed: $dstmed"
-	else
-		echo "NAS is not accessible, listing local disks only"
-		dstmed="$(ls -1 "/media/$USERNAME/" | fzf)"
-	fi
-	[ -z "$dstmed" ] && echo "ERR dstmed is empty" && exit 10
-	[ "$dstmed" == 'NAS----' ] && echo "wrong value select in fzf" && exit 101
-	[ "$dstmed" == 'LOCAL----' ] && echo "wrong value select in fzf" && exit 101
-fi
-echo "dstmed: $dstmed (final)"
+[ ! -r "$DESTPATHS_FILE" ] && echo "$0 ERR_DESTPATHS_FILE" && exit 5
+echo "Select destination drive:"
+SELECTED_DEST_DRIVE=$(cat "$DESTPATHS_FILE" | fzf)
+echo "SELECTED_DEST_DRIVE = $SELECTED_DEST_DRIVE" | tee -a $debugf
 
-# determine the type of chosen destination (local or nas) safely
-if [ -e "/media/$USERNAME/$dstmed" ] && [ -e "$NAS/$dstmed" ]; then
-	echo "$dstmed seems to exist on both local and nas, can't continue, please check"
-	exit 11
-fi
+# Abort if destination already exists
+DESTINATION_GAMEDIR_PATH="/storage/nas/$SELECTED_DEST_DRIVE/Games/LUTRIS/$GAMESTORE/$FL/$GAMEDIR"
+DESTINATION_GAMEDIR_PARENT="$(dirname "$DESTINATION_GAMEDIR_PATH")"
+[ -e "$DESTINATION_GAMEDIR_PATH" ] && echo "$0 DESTDIR_EXISTS" && exit 6
 
-# since we know it's unique (from above) we can proceed in any order:
-if [ -e "$NAS/$dstmed" ]; then
-	DEST_TYPE='nas'
-	echo "DEST_TYPE: $DEST_TYPE"
-
-elif [ -e "/media/$USERNAME/$dstmed" ]; then
-	DEST_TYPE='local'
-	echo "DEST_TYPE: $DEST_TYPE"
-
-else
-	echo "$dstmed not found on either local or nas. exit 12"
-	exit 12
-fi
-
-if [ "$DEST_TYPE" = "local" ]; then
-	dst="/media/$USERNAME/$dstmed/$(dirname "$srcpath")/"
-	echo "dst: $dst"
-elif [ "$DEST_TYPE" = "nas" ]; then
-	dst="$NAS/$dstmed/$(dirname "$srcpath")/"
-	echo "dst: $dst"
-else
-	echo "DEST_TYPE cannot be empty. exit 13"
-	exit 13
-fi
+migration_text="###\nWill attempt migrating:\n/storage/nas/$SRC_DRIVE/Games/LUTRIS/$GAMESTORE/$FL/$GAMEDIR\nto\n$DESTINATION_GAMEDIR_PARENT\n###\n"
+echo -e $migration_text | tee -a $debugf
 
 function get_configpath () {
 (
 sqlite3 "$LUTRIS_DBFILE" << EOT
-SELECT configpath FROM games WHERE slug="$SLUG" ORDER BY configpath DESC LIMIT 1;
+SELECT configpath FROM games WHERE slug='$1' ORDER BY configpath DESC LIMIT 1;
 EOT
 )
 }
 
-# get yaml file name:
-if [ -r "$LUTRIS_GAMEDIR"/"$(get_configpath "$SLUG")"".yml" ]; then
-	YAML="$LUTRIS_GAMEDIR"/"$(get_configpath "$SLUG")"".yml"
-elif [ -e "$LUTRIS_GAMEDIR"/"${SLUG:0:1}"/"$(get_configpath "$SLUG")"".yml" ]; then
-	# use FirstLetterDir variant:
-	YAML="$LUTRIS_GAMEDIR"/"${SLUG:0:1}"/"$(get_configpath "$SLUG")"".yml"
-else
-	echo "ERROR, yaml find not found at normal or alternative locations"
+# Check yaml file
+YAML="$LUTRIS_GAMEDIR/$(get_configpath $SLUG).yml"
+if [ 1 -r "$YAML" ]; then
+	echo "ERROR yaml file find not found, or unreadable at expected location: $YAML" | tee -a $debugf
 	exit 15
 fi
+echo "YAML = $YAML" | tee -a $debugf
 
-echo "YAML = $YAML"
+echo "Copying data..." | tee -a $debugf
+echo mkdir -p "$DESTINATION_GAMEDIR_PARENT/" | tee -a $debugf
+rsync -avP "/storage/nas/$SRC_DRIVE/Games/LUTRIS/$GAMESTORE/$FL/$GAMEDIR" "$DESTINATION_GAMEDIR_PARENT/" | tee -a $debugf
 
-echo "Copying data..."
-rsync -avP "$src" "$dst"  || exit 1
+echo "Modifying YAML game file with new path $DESTINATION_GAMEDIR_PATH" | tee -a $debugf
+sed -i "s;/storage/nas/$SRC_DRIVE/Games/LUTRIS/$GAMESTORE/$FL/;$DESTINATION_GAMEDIR_PARENT/;g" "$YAML" || exit 20
 
-echo "Modifying game file with: "
-if [ "$DEST_TYPE" == "nas" ]; then
-	dest_string="$NAS/$dstmed"
-else
-	dest_string="/media/$USERNAME/$dstmed"
-fi
+echo "Delete /storage/nas/$SRC_DRIVE/Games/LUTRIS/$GAMESTORE/$FL/$GAMEDIR ?" | tee -a $debugf
+echo "Confirm with YES, or type anything else to dismiss cancel" | tee -a $debugf
+read -r choice
+echo "choice = $choice" | tee -a $debugf
 
-if [ "$SRC_TYPE" == "nas" ]; then
-	src_string="$NAS/$srcmed"
-else
-	src_string="/media/$USERNAME/$srcmed"
-fi
-
-echo "sed -i \"s,$src_string,$dest_string,g\" \"$YAML\""
-sed -i "s,$src_string,$dest_string,g" "$YAML" || exit 20
-
-if [ "$DELETE_SRC" != "1" ]; then
-	echo "Delete $src ?"
-	echo "YES  or anything else to dismiss cancel"
-	read -r choice
-	
-	case "$choice" in
-		"YES") rm -Rf "$src" ;;
-		*) echo "skip delete" ;;
-	esac
-else
-	rm -Rf "$src"
-	echo "ret: $?"
-fi
+case "$choice" in
+	"YES") rm -Rf "/storage/nas/$SRC_DRIVE/Games/LUTRIS/$GAMESTORE/$FL/$GAMEDIR" ;;
+	*) echo "skip delete" | tee -a $debugf ;;
+esac
 
 exit 0
